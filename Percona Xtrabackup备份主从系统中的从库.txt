@@ -1,0 +1,37 @@
+#原因是这样的，原本生产过程中使用的是每天一次逻辑全备。打算将其改为每天XtraBackup全备同时拉取主库的binlog到备份存储机
+
+基本命令其实是大同小异的
+innobackupex --defaults-file=/etc/my.cnf --user=root --password=123456 /bak
+由于XtraBackup采用的是物理加逻辑备份的形式，导致其备份时会拷贝共享表空间等等有关运行状态的文件。再加上MySQL的数据文件不是压缩的可能会导致生成的备份目录占用空间过大的情况，
+    
+	即使存储服务机容量大，也吃不住每天这样存，而且传输目录的效率可能会略低，以后挪转或者下载到线下都很不方便，因此需要对生成的备份目录进行打包
+
+	innobackupex --defaults-file=/etc/my.cnf --user=root --password=123456 --stream=tar 。 |cat > `date -%F_%H%M%S`.tar                #只打包
+	innobackupex --defaults-file=/etc/my.cnf --user=root --password=123456 --stream=tar . |gzip cat ->`date -%F_%H%M%S`.tar.gz #打包并通过管道传输到GZIP程序进行压缩
+	
+	到这里的话，一切都没问题
+	但是！在这种情况下：
+	                   环境：Cent7.1 MySQL5.6 主从传统复制   备份策略：从库全备，主库binlog备份
+	会导致使用从库备份的数据恢复后，无法快速的与主库的binlog位置对应。恢复操作本应是越快越好，但这种情况下将会浪费大量的时间，经同行提醒，可以加--slave-info，让从库输出对应到主库的binlog文件信息和位置
+	本应是：
+	innobackupex innobackupex --defaults-file=/etc/my.cnf --user=root --password=123456 --slave-info --stream=tar . |gzip cat ->`date -%F_%H%M%S`.tar.gz
+	但实际备份几天检查后发现，压缩包中的“xtrabackup_slave-info”文件被截断，只剩下了 "CHANGE M"。而不加打包，直接生成原始备份文件中的“xtrabackup_slave-info”文件则是完整的
+	很疑惑，又做了几次试验，还是如此，索性换成xbstrem流格式
+	innobackupex innobackupex --defaults-file=/etc/my.cnf --user=root --password=123456 --slave-info --stream=xbstream . |gzip cat ->`date -%F_%H%M%S`.xb.gz
+	
+	注：xbstream是perconna公司专用于xtrabackup的一种打包流格式。不可以使用其他软件解压。xbstream在xtrabackup安装的时候也会一同安装上。
+	使用方法：
+	gunzip -c 2017090100000.xb.gz |xbstream -x -C /to_unzip
+	
+	
+	
+	
+	
+	
+	
+					   
+	
+	
+	
+
+
