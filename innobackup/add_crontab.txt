@@ -1,0 +1,1 @@
+00 00 * * * sh /dbatools/bak_and_log.sh

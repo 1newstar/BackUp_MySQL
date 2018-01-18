@@ -1,0 +1,13 @@
+﻿#zrz
+
+#xb.gz格式:
+
+在Linux（安装过xtrabackup软件）下
+
+gunzip xx.xb.gz -c|xbstream -x -C /解压目录
+
+
+#tar.gz格式
+
+tar -xzf xx.tar.gz -C 
+/解压目录
